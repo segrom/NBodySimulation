@@ -1,0 +1,54 @@
+﻿// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel k_star_acceleration
+#define GRAVITY_CONST 6.67e-11
+
+int _kernel_size;
+int _kernel_counts ;
+int _groups_count ;
+int _groups_size ;
+
+struct Star
+{
+    float X;
+    float Y;
+    float Z;
+    float Vx;
+    float Vy;
+    float Vz;
+    float Ax;
+    float Ay;
+    float Az;
+    float Radius;
+    float Mass;
+};
+
+RWStructuredBuffer<Star> starsBuffer;
+
+[numthreads(32,32,1)]
+void k_star_acceleration (uint3 id : SV_DispatchThreadID)
+{
+
+    int starsCount = _kernel_size * _kernel_counts * _groups_count * _groups_size;
+    int starIndex = id.x * _groups_count * _kernel_counts + id.y;
+    Star star = starsBuffer[starIndex];
+    float3 position = float3(star.X,star.Y,star.Z);
+    for (int i= 0; i  < starsCount; i++)
+    {
+        if(i==starIndex) continue;
+        Star otherStar = starsBuffer[i];
+        float3 otherPos = float3(otherStar.X,otherStar.Y,otherStar.Z);
+        float forceValue = (star.Mass * otherStar.Mass * GRAVITY_CONST) / distance(position,otherPos);
+        float3 force = normalize(otherPos-position) * forceValue;
+        star.Ax += force.x/star.Mass;
+        star.Ay += force.y/star.Mass;
+        star.Az += force.z/star.Mass;
+    }
+    star.Vx += star.Ax;
+    star.Vy += star.Ay;
+    star.Vz += star.Az;
+    star.X += star.Vx;
+    star.Y += star.Vy;
+    star.Z += star.Vz;
+    starsBuffer[starIndex] = star;
+}
+
